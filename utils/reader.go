@@ -83,21 +83,3 @@ func (r *Reader) Next() (*protobuf.Example, error) {
 
 	return ex, nil
 }
-
-// ExampleFeatureBytes is a helper function for decoding proto Bytes feature
-// from a TensorFlow Example. If key is not found it returns default value
-func ExampleFeatureBytes(example *protobuf.Example, key string) []byte {
-  print(example.GetFeatures())
-	// TODO: return error if key is not found?
-	f, ok := example.Features.Feature[key]
-	if !ok {
-		return nil
-	}
-
-	val, ok := f.Kind.(*protobuf.Feature_BytesList)
-	if !ok {
-		return nil
-	}
-
-	return val.BytesList.Value[0]
-}
