@@ -16,14 +16,17 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-  "io"
+	"io"
+	"math"
 	"os"
-  "math"
-	"github.com/spf13/cobra"
-  "google.golang.org/protobuf/encoding/protojson"
 
-  "github.com/emla2805/tfr/utils"
+	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	tfr "github.com/emla2805/tfr/protobuf"
+	"github.com/emla2805/tfr/utils"
 )
 
 var numberRecords int
@@ -60,17 +63,17 @@ var rootCmd = &cobra.Command{
   `,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-    if isInputFromPipe() {
-        return parseRecords(os.Stdin)
-    } else {
-        file, e := os.Open(args[0])
-        if e != nil {
-          return e
-        }
-        defer file.Close()
-        return parseRecords(file)
-    }
-  },
+		if isInputFromPipe() {
+			return parseRecords(os.Stdin)
+		} else {
+			file, e := os.Open(args[0])
+			if e != nil {
+				return e
+			}
+			defer file.Close()
+			return parseRecords(file)
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -82,38 +85,60 @@ func Execute() {
 	}
 }
 
+type Example struct {
+	Features []Feature
+}
+
+type Feature struct {
+	Key   string
+	Value interface{}
+}
+
 func init() {
 	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "Number of records to show")
 }
 
 func isInputFromPipe() bool {
-  fileInfo, _ := os.Stdin.Stat()
-  return fileInfo.Mode() & os.ModeCharDevice == 0
+	fileInfo, _ := os.Stdin.Stat()
+	return fileInfo.Mode()&os.ModeCharDevice == 0
 }
-
 
 func parseRecords(r io.Reader) error {
-  reader := utils.NewReader(r)
-  count := 0
+	reader := utils.NewReader(r)
+	count := 0
 
-  for {
-    example, e := reader.Next()
+	for {
+		example, e := reader.Next()
 
-    if count >= numberRecords {
-      break
-    }
+		if count >= numberRecords {
+			break
+		}
 
-    if e == io.EOF {
-      break
-    } else if e != nil {
-      return e
-    }
+		if e == io.EOF {
+			break
+		} else if e != nil {
+			return e
+		}
 
-    json, _ := protojson.Marshal(example)
-    fmt.Fprintln(os.Stdout, string(json))
+		ex := &Example{
+			Features: []Feature{},
+		}
+		json1, _ := protojson.Marshal(example)
+		for k, v := range example.Features.Feature {
+			switch t := v.Kind.(type) {
+			case *tfr.Feature_BytesList:
+				for _, val := range t.BytesList.Value {
+					ex.Features = append(ex.Features, Feature{Key: k, Value: val})
+					fmt.Printf("%s: %s\n", k, val)
+				}
+			}
+		}
+		fmt.Println(ex)
+		j, _ := json.Marshal(e)
+		fmt.Fprintln(os.Stdout, string(json1))
+		fmt.Fprintln(os.Stdout, string(j))
 
-    count++
-  }
-  return nil
+		count++
+	}
+	return nil
 }
-
