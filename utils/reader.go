@@ -1,15 +1,14 @@
 package utils
 
-
 import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-  "hash/crc32"
+	"hash/crc32"
 	"io"
 
-	"github.com/golang/protobuf/proto"
 	protobuf "github.com/emla2805/tfr/protobuf"
+	"github.com/golang/protobuf/proto"
 )
 
 const (
@@ -17,9 +16,8 @@ const (
 )
 
 var (
-  crc32c = crc32.MakeTable(crc32.Castagnoli)
+	crc32c = crc32.MakeTable(crc32.Castagnoli)
 )
-
 
 // Reader implements a reader for TFRecords with Example protos
 type Reader struct {

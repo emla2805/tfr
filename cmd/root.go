@@ -33,32 +33,31 @@ var numberRecords int
 var rootCmd = &cobra.Command{
 	Use:   "tfr",
 	Short: "A lightweight commandline TFRecords processor",
-	Long: `tfr is tool for processing TFRecords. 
+	Long: `tfr is a lightweight command-line TFRecords processor that 
+reads serialized .tfrecord files and outputs to stdout in JSON format.
 
-  Example:
-
-  tfr data_tfrecord-00000-of-00001
-  {
-    "features": {
-      "feature": {
-        "a": {
-          "bytesList": {
-            "value": [
-              "some text"
-            ]
-          }
-        },
-        "label": {
-          "int64List": {
-            "value": [
-              0
-            ]
-          }
+Example:
+$ tfr data_tfrecord-00000-of-00001
+{
+  "features": {
+    "feature": {
+      "a": {
+        "bytesList": {
+          "value": [
+            "some text"
+          ]
+        }
+      },
+      "label": {
+        "int64List": {
+          "value": [
+            0
+          ]
         }
       }
     }
   }
-
+}
   `,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,8 +74,6 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
