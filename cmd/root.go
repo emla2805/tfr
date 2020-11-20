@@ -85,58 +85,50 @@ func Execute() {
 }
 
 type Example struct {
-	Features []Feature
+	Features map[string]Feature `json:"features"`
 }
 
 func NewExample(example *tfr.Example) *Example {
+	feature := make(Feature)
 	ex := &Example{
-		Features: []Feature{},
+		Features: make(map[string]Feature),
 	}
 	for k, v := range example.Features.Feature {
-		ex.Features = append(ex.Features, Feature{Name: k, Value: v})
+		feature[k] = v
 	}
+	ex.Features["feature"] = feature
 	return ex
 }
 
-type Feature struct {
-	Name  string
-	Value *tfr.Feature
-	Type  string
-}
+type Feature map[string]*tfr.Feature
 
 func (f Feature) MarshalJSON() ([]byte, error) {
-	var value interface{}
-	var typ string
-	switch t := f.Value.Kind.(type) {
-	case *tfr.Feature_BytesList:
-		typ = "bytesList"
-		stringList := []string{}
-		for _, byts := range t.BytesList.Value {
-			stringList = append(stringList, string(byts))
+	output := make(map[string]interface{})
+	for k, v := range f {
+		var typ string
+		value := make(map[string]interface{})
+		typMap := make(map[string]interface{})
+		switch t := v.Kind.(type) {
+		case *tfr.Feature_BytesList:
+			typ = "bytesList"
+			stringList := []string{}
+			for _, byts := range t.BytesList.Value {
+				stringList = append(stringList, string(byts))
+			}
+			value["value"] = stringList
+		case *tfr.Feature_FloatList:
+			typ = "floatList"
+			value["value"] = t.FloatList.Value
+		case *tfr.Feature_Int64List:
+			typ = "int64List"
+			value["value"] = t.Int64List.Value
 		}
-		value = stringList
-	case *tfr.Feature_FloatList:
-		typ = "floatList"
-		value = t.FloatList.Value
-	case *tfr.Feature_Int64List:
-		typ = "int64List"
-		value = t.Int64List.Value
+		typMap[typ] = value
+		output[k] = typMap
 	}
-	return json.Marshal(&struct {
-		Name  string
-		Type  string
-		Value interface{}
-	}{
-		Name:  f.Name,
-		Type:  typ,
-		Value: value,
-	})
-}
 
-//type Feature struct {
-//	Key   string
-//	Value interface{}
-//}
+	return json.Marshal(output)
+}
 
 func init() {
 	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "Number of records to show")
