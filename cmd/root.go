@@ -16,14 +16,16 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-  "io"
+	"io"
+	"math"
 	"os"
-  "math"
-	"github.com/spf13/cobra"
-  "google.golang.org/protobuf/encoding/protojson"
 
-  "github.com/emla2805/tfr/utils"
+	"github.com/spf13/cobra"
+
+	tfr "github.com/emla2805/tfr/protobuf"
+	"github.com/emla2805/tfr/utils"
 )
 
 var numberRecords int
@@ -60,17 +62,17 @@ var rootCmd = &cobra.Command{
   `,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-    if isInputFromPipe() {
-        return parseRecords(os.Stdin)
-    } else {
-        file, e := os.Open(args[0])
-        if e != nil {
-          return e
-        }
-        defer file.Close()
-        return parseRecords(file)
-    }
-  },
+		if isInputFromPipe() {
+			return parseRecords(os.Stdin)
+		} else {
+			file, e := os.Open(args[0])
+			if e != nil {
+				return e
+			}
+			defer file.Close()
+			return parseRecords(file)
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -82,38 +84,87 @@ func Execute() {
 	}
 }
 
+type Example struct {
+	Features map[string]Feature `json:"features"`
+}
+
+func NewExample(example *tfr.Example) *Example {
+	feature := make(Feature)
+	ex := &Example{
+		Features: make(map[string]Feature),
+	}
+	for k, v := range example.Features.Feature {
+		feature[k] = v
+	}
+	ex.Features["feature"] = feature
+	return ex
+}
+
+type Feature map[string]*tfr.Feature
+
+func (f Feature) MarshalJSON() ([]byte, error) {
+	output := make(map[string]interface{})
+	for k, v := range f {
+		var typ string
+		value := make(map[string]interface{})
+		typMap := make(map[string]interface{})
+		switch t := v.Kind.(type) {
+		case *tfr.Feature_BytesList:
+			typ = "bytesList"
+			stringList := []string{}
+			for _, byts := range t.BytesList.Value {
+				stringList = append(stringList, string(byts))
+			}
+			value["value"] = stringList
+		case *tfr.Feature_FloatList:
+			typ = "floatList"
+			value["value"] = t.FloatList.Value
+		case *tfr.Feature_Int64List:
+			typ = "int64List"
+			value["value"] = t.Int64List.Value
+		}
+		typMap[typ] = value
+		output[k] = typMap
+	}
+
+	return json.Marshal(output)
+}
+
 func init() {
 	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "Number of records to show")
 }
 
 func isInputFromPipe() bool {
-  fileInfo, _ := os.Stdin.Stat()
-  return fileInfo.Mode() & os.ModeCharDevice == 0
+	fileInfo, _ := os.Stdin.Stat()
+	return fileInfo.Mode()&os.ModeCharDevice == 0
 }
-
 
 func parseRecords(r io.Reader) error {
-  reader := utils.NewReader(r)
-  count := 0
+	reader := utils.NewReader(r)
+	count := 0
 
-  for {
-    example, e := reader.Next()
+	for {
+		example, e := reader.Next()
 
-    if count >= numberRecords {
-      break
-    }
+		if count >= numberRecords {
+			break
+		}
 
-    if e == io.EOF {
-      break
-    } else if e != nil {
-      return e
-    }
+		if e == io.EOF {
+			break
+		} else if e != nil {
+			return e
+		}
 
-    json, _ := protojson.Marshal(example)
-    fmt.Fprintln(os.Stdout, string(json))
+		// convert to local example
+		ex := NewExample(example)
+		j, err := json.Marshal(ex)
+		if err != nil {
+			return err
+		}
 
-    count++
-  }
-  return nil
+		fmt.Fprintln(os.Stdout, string(j))
+		count++
+	}
+	return nil
 }
-
