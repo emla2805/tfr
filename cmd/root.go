@@ -23,7 +23,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	tfr "github.com/emla2805/tfr/protobuf"
 	"github.com/emla2805/tfr/utils"
@@ -89,10 +88,55 @@ type Example struct {
 	Features []Feature
 }
 
-type Feature struct {
-	Key   string
-	Value interface{}
+func NewExample(example *tfr.Example) *Example {
+	ex := &Example{
+		Features: []Feature{},
+	}
+	for k, v := range example.Features.Feature {
+		ex.Features = append(ex.Features, Feature{Name: k, Value: v})
+	}
+	return ex
 }
+
+type Feature struct {
+	Name  string
+	Value *tfr.Feature
+	Type  string
+}
+
+func (f Feature) MarshalJSON() ([]byte, error) {
+	var value interface{}
+	var typ string
+	switch t := f.Value.Kind.(type) {
+	case *tfr.Feature_BytesList:
+		typ = "bytesList"
+		stringList := []string{}
+		for _, byts := range t.BytesList.Value {
+			stringList = append(stringList, string(byts))
+		}
+		value = stringList
+	case *tfr.Feature_FloatList:
+		typ = "floatList"
+		value = t.FloatList.Value
+	case *tfr.Feature_Int64List:
+		typ = "int64List"
+		value = t.Int64List.Value
+	}
+	return json.Marshal(&struct {
+		Name  string
+		Type  string
+		Value interface{}
+	}{
+		Name:  f.Name,
+		Type:  typ,
+		Value: value,
+	})
+}
+
+//type Feature struct {
+//	Key   string
+//	Value interface{}
+//}
 
 func init() {
 	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "Number of records to show")
@@ -120,24 +164,14 @@ func parseRecords(r io.Reader) error {
 			return e
 		}
 
-		ex := &Example{
-			Features: []Feature{},
+		// convert to local example
+		ex := NewExample(example)
+		j, err := json.Marshal(ex)
+		if err != nil {
+			return err
 		}
-		json1, _ := protojson.Marshal(example)
-		for k, v := range example.Features.Feature {
-			switch t := v.Kind.(type) {
-			case *tfr.Feature_BytesList:
-				for _, val := range t.BytesList.Value {
-					ex.Features = append(ex.Features, Feature{Key: k, Value: val})
-					fmt.Printf("%s: %s\n", k, val)
-				}
-			}
-		}
-		fmt.Println(ex)
-		j, _ := json.Marshal(e)
-		fmt.Fprintln(os.Stdout, string(json1))
-		fmt.Fprintln(os.Stdout, string(j))
 
+		fmt.Fprintln(os.Stdout, string(j))
 		count++
 	}
 	return nil
