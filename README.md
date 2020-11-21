@@ -11,6 +11,11 @@ If you have Go installed, just run `go get`.
 
     go get github.com/emla2805/tfr
 
+On MacOs, use [Homebrew](https://brew.sh).
+
+    brew tap emla2805/tfr
+    brew install tfr
+
 ## Usage
 
 Parse a single file on the terminal
