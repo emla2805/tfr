@@ -1,0 +1,7 @@
+brews:
+  - 
+    github:
+      owner: emla2805
+      name: homebrew-tfr
+    homepage: https://github.com/emla2805/tfr
+    description: A lightweight commandline TFRecords processor
