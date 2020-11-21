@@ -31,35 +31,31 @@ import (
 var numberRecords int
 
 var rootCmd = &cobra.Command{
-	Use:   "tfr",
+	Use:   "tfr {file ... | -}",
 	Short: "A lightweight commandline TFRecords processor",
 	Long: `tfr is a lightweight command-line TFRecords processor that 
-reads serialized .tfrecord files and outputs to stdout in JSON format.
-
-Example:
-$ tfr data_tfrecord-00000-of-00001
-{
-  "features": {
-    "feature": {
-      "a": {
-        "bytesList": {
-          "value": [
-            "some text"
-          ]
-        }
-      },
-      "label": {
-        "int64List": {
-          "value": [
-            0
-          ]
+reads serialized .tfrecord files and outputs to stdout in JSON format.`,
+	Example: `  $ tfr data_tfrecord-00000-of-00001
+  {
+    "features": {
+      "feature": {
+        "a": {
+          "bytesList": {
+            "value": [
+              "some text"
+            ]
+          }
+        },
+        "label": {
+          "int64List": {
+            "value": [
+              0
+            ]
+          }
         }
       }
     }
-  }
-}
-  `,
-
+  }`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if isInputFromPipe() {
 			return parseRecords(os.Stdin)
@@ -128,7 +124,7 @@ func (f Feature) MarshalJSON() ([]byte, error) {
 }
 
 func init() {
-	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "Number of records to show")
+	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "number of records to show")
 }
 
 func isInputFromPipe() bool {
