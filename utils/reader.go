@@ -32,7 +32,7 @@ func NewReader(r io.Reader) *Reader {
 }
 
 // Verify checksum
-func (w *Reader) verifyChecksum(data []byte, crcMasked uint32) bool {
+func (r *Reader) verifyChecksum(data []byte, crcMasked uint32) bool {
 	rot := crcMasked - kMaskDelta
 	unmaskedCrc := ((rot >> 17) | (rot << 15))
 
