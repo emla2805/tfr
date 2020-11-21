@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -56,17 +57,28 @@ reads serialized .tfrecord files and outputs results as JSON on standard output.
       }
     }
   }`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 || isInputFromPipe() {
+			return nil
+		}
+		return errors.New("requires argument or stdin")
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var buffers []io.Reader
 		if isInputFromPipe() {
-			return parseRecords(os.Stdin)
-		} else {
-			file, e := os.Open(args[0])
+			buffers = append(buffers, os.Stdin)
+		}
+
+		for _, path := range args {
+			file, e := os.Open(path)
 			if e != nil {
 				return e
 			}
 			defer file.Close()
-			return parseRecords(file)
+			buffers = append(buffers, file)
 		}
+		multi := io.MultiReader(buffers...)
+		return parseRecords(multi)
 	},
 }
 
