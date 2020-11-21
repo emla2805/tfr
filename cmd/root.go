@@ -34,7 +34,7 @@ var rootCmd = &cobra.Command{
 	Use:   "tfr {file ... | -}",
 	Short: "A lightweight commandline TFRecords processor",
 	Long: `tfr is a lightweight command-line TFRecords processor that 
-reads serialized .tfrecord files and outputs to stdout in JSON format.`,
+reads serialized .tfrecord files and outputs results as JSON on standard output.`,
 	Example: `  $ tfr data_tfrecord-00000-of-00001
   {
     "features": {
