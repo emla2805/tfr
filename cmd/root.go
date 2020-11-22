@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,7 +25,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 
+	protobuf "github.com/emla2805/tfr/protobuf"
 	tfr "github.com/emla2805/tfr/protobuf"
 	"github.com/emla2805/tfr/utils"
 )
@@ -64,21 +67,45 @@ reads serialized .tfrecord files and outputs results as JSON on standard output.
 		return errors.New("requires argument or stdin")
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var buffers []io.Reader
+		var readers []io.Reader
 		if isInputFromPipe() {
-			buffers = append(buffers, os.Stdin)
+			readers = append(readers, os.Stdin)
 		}
 
 		for _, path := range args {
-			file, e := os.Open(path)
-			if e != nil {
-				return e
+			file, err := os.Open(path)
+			if err != nil {
+				return err
 			}
 			defer file.Close()
-			buffers = append(buffers, file)
+			readers = append(readers, file)
 		}
-		multi := io.MultiReader(buffers...)
-		return parseRecords(multi)
+		multi := io.MultiReader(readers...)
+
+		scanner := bufio.NewScanner(multi)
+		scanner.Split(utils.ScanTFRecord)
+
+		count := 0
+		for scanner.Scan() {
+			if count >= numberRecords {
+				break
+			}
+			example := &protobuf.Example{}
+			err := proto.Unmarshal(scanner.Bytes(), example)
+			if err != nil {
+				return err
+			}
+			// convert to local example
+			ex := NewExample(example)
+			jsonBytes, err := json.Marshal(ex)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stdout, string(jsonBytes))
+
+			count++
+		}
+		return nil
 	},
 }
 
@@ -142,34 +169,4 @@ func init() {
 func isInputFromPipe() bool {
 	fileInfo, _ := os.Stdin.Stat()
 	return fileInfo.Mode()&os.ModeCharDevice == 0
-}
-
-func parseRecords(r io.Reader) error {
-	reader := utils.NewReader(r)
-	count := 0
-
-	for {
-		example, e := reader.Next()
-
-		if count >= numberRecords {
-			break
-		}
-
-		if e == io.EOF {
-			break
-		} else if e != nil {
-			return e
-		}
-
-		// convert to local example
-		ex := NewExample(example)
-		j, err := json.Marshal(ex)
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintln(os.Stdout, string(j))
-		count++
-	}
-	return nil
 }

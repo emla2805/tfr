@@ -1,39 +1,24 @@
 package utils
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
-	"io"
-
-	protobuf "github.com/emla2805/tfr/protobuf"
-	"github.com/golang/protobuf/proto"
 )
 
 const (
-	kMaskDelta = 0xa282ead8
+	maskDelta = 0xa282ead8
+	headerLen = 12
+	footerLen = 4
 )
 
 var (
 	crc32c = crc32.MakeTable(crc32.Castagnoli)
 )
 
-// Reader implements a reader for TFRecords with Example protos
-type Reader struct {
-	reader *bufio.Reader
-}
-
-// NewReader returns a new Reader
-func NewReader(r io.Reader) *Reader {
-	return &Reader{
-		reader: bufio.NewReader(r),
-	}
-}
-
 // Verify checksum
-func (r *Reader) verifyChecksum(data []byte, crcMasked uint32) bool {
-	rot := crcMasked - kMaskDelta
+func verifyChecksum(data []byte, crcMasked uint32) bool {
+	rot := crcMasked - maskDelta
 	unmaskedCrc := ((rot >> 17) | (rot << 15))
 
 	crc := crc32.Checksum(data, crc32c)
@@ -41,43 +26,26 @@ func (r *Reader) verifyChecksum(data []byte, crcMasked uint32) bool {
 	return crc == unmaskedCrc
 }
 
-// Next reads the next Example from the TFRecords input
-func (r *Reader) Next() (*protobuf.Example, error) {
-	header := make([]byte, 12)
-	_, err := io.ReadFull(r.reader, header)
-	if err != nil {
-		return nil, err
+// ScanTFRecord scans a single record
+func ScanTFRecord(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if len(data) < headerLen {
+		return 0, nil, nil
 	}
-
+	header := data[:headerLen]
+	recordLen := int(binary.LittleEndian.Uint64(header[0:8]))
 	crc := binary.LittleEndian.Uint32(header[8:12])
-	if !r.verifyChecksum(header[0:8], crc) {
-		return nil, errors.New("Invalid crc for length")
+	if !verifyChecksum(header[0:8], crc) {
+		return 0, nil, errors.New("Invalid crc for length")
 	}
-
-	length := binary.LittleEndian.Uint64(header[0:8])
-
-	payload := make([]byte, length)
-	_, err = io.ReadFull(r.reader, payload)
-	if err != nil {
-		return nil, err
+	if len(data) < headerLen+recordLen+footerLen {
+		return 0, nil, nil
 	}
-
-	footer := make([]byte, 4)
-	_, err = io.ReadFull(r.reader, footer)
-	if err != nil {
-		return nil, err
-	}
+	payload := data[headerLen : headerLen+recordLen]
+	footer := data[headerLen+recordLen : headerLen+recordLen+footerLen]
 
 	crc = binary.LittleEndian.Uint32(footer[0:4])
-	if !r.verifyChecksum(payload, crc) {
-		return nil, errors.New("Invalid crc for payload")
+	if !verifyChecksum(payload, crc) {
+		return 0, nil, errors.New("Invalid crc for payload")
 	}
-
-	ex := &protobuf.Example{}
-	err = proto.Unmarshal(payload, ex)
-	if err != nil {
-		return nil, err
-	}
-
-	return ex, nil
+	return headerLen + recordLen + footerLen, payload, nil
 }
