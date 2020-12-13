@@ -17,22 +17,20 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"math"
 	"os"
 
-	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/proto"
-
 	protobuf "github.com/emla2805/tfr/protobuf"
-	tfr "github.com/emla2805/tfr/protobuf"
 	"github.com/emla2805/tfr/utils"
 )
 
 var numberRecords int
+var record string
 
 var rootCmd = &cobra.Command{
 	Use:   "tfr {file ... | -}",
@@ -85,19 +83,27 @@ reads serialized .tfrecord files and outputs results as JSON on standard output.
 		scanner := bufio.NewScanner(multi)
 		scanner.Split(utils.ScanTFRecord)
 
+		var example proto.Message
+		switch record {
+		case "example":
+			example = &protobuf.Example{}
+		case "sequence_example":
+			example = &protobuf.SequenceExample{}
+		default:
+			example = &protobuf.Example{}
+		}
+
 		count := 0
 		for scanner.Scan() {
 			if count >= numberRecords {
 				break
 			}
-			example := &protobuf.Example{}
 			err := proto.Unmarshal(scanner.Bytes(), example)
 			if err != nil {
 				return err
 			}
-			// convert to local example
-			ex := NewExample(example)
-			jsonBytes, err := json.Marshal(ex)
+
+			jsonBytes, err := utils.Marshal(example)
 			if err != nil {
 				return err
 			}
@@ -116,54 +122,9 @@ func Execute() {
 	}
 }
 
-type Example struct {
-	Features map[string]Feature `json:"features"`
-}
-
-func NewExample(example *tfr.Example) *Example {
-	feature := make(Feature)
-	ex := &Example{
-		Features: make(map[string]Feature),
-	}
-	for k, v := range example.Features.Feature {
-		feature[k] = v
-	}
-	ex.Features["feature"] = feature
-	return ex
-}
-
-type Feature map[string]*tfr.Feature
-
-func (f Feature) MarshalJSON() ([]byte, error) {
-	output := make(map[string]interface{})
-	for k, v := range f {
-		var typ string
-		value := make(map[string]interface{})
-		typMap := make(map[string]interface{})
-		switch t := v.Kind.(type) {
-		case *tfr.Feature_BytesList:
-			typ = "bytesList"
-			stringList := []string{}
-			for _, byts := range t.BytesList.Value {
-				stringList = append(stringList, string(byts))
-			}
-			value["value"] = stringList
-		case *tfr.Feature_FloatList:
-			typ = "floatList"
-			value["value"] = t.FloatList.Value
-		case *tfr.Feature_Int64List:
-			typ = "int64List"
-			value["value"] = t.Int64List.Value
-		}
-		typMap[typ] = value
-		output[k] = typMap
-	}
-
-	return json.Marshal(output)
-}
-
 func init() {
 	rootCmd.Flags().IntVarP(&numberRecords, "number", "n", math.MaxInt32, "number of records to show")
+	rootCmd.Flags().StringVarP(&record, "record", "r", "example", "record type { example | sequence_example }")
 }
 
 func isInputFromPipe() bool {
