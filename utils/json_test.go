@@ -7,25 +7,61 @@ import (
 )
 
 var (
-	fs = map[string]*protobuf.Feature{
-		"age": {
-			Kind: &protobuf.Feature_Int64List{
-				Int64List: &protobuf.Int64List{Value: []int64{29}},
-			},
+	age = &protobuf.Feature{
+		Kind: &protobuf.Feature_Int64List{
+			Int64List: &protobuf.Int64List{Value: []int64{29}},
 		},
-		"movie": {
-			Kind: &protobuf.Feature_BytesList{
-				BytesList: &protobuf.BytesList{Value: [][]byte{[]byte("The Shawshank Redemption"), []byte("Fight Club")}},
-			},
+	}
+	movie = &protobuf.Feature{
+		Kind: &protobuf.Feature_BytesList{
+			BytesList: &protobuf.BytesList{Value: [][]byte{
+				[]byte("The Shawshank Redemption"), []byte("Fight Club")}},
 		},
-		"movie_ratings": {
-			Kind: &protobuf.Feature_FloatList{
-				FloatList: &protobuf.FloatList{Value: []float32{9.0, 9.7}},
+	}
+	movieRating = &protobuf.Feature{
+		Kind: &protobuf.Feature_FloatList{
+			FloatList: &protobuf.FloatList{Value: []float32{9.0, 9.7}},
+		},
+	}
+
+	example = &protobuf.Example{
+		Features: &protobuf.Features{
+			Feature: map[string]*protobuf.Feature{
+				"age":           age,
+				"movie":         movie,
+				"movie_ratings": movieRating,
 			},
 		},
 	}
-	example = &protobuf.Example{
-		Features: &protobuf.Features{Feature: fs},
+
+	movieNames   = &protobuf.FeatureList{Feature: []*protobuf.Feature{movie}}
+	movieRatings = &protobuf.FeatureList{Feature: []*protobuf.Feature{movieRating}}
+	movie1Actors = &protobuf.Feature{
+		Kind: &protobuf.Feature_BytesList{
+			BytesList: &protobuf.BytesList{Value: [][]byte{
+				[]byte("Tim Robbins"), []byte("Morgan Freeman")}},
+		},
+	}
+	movie2Actors = &protobuf.Feature{
+		Kind: &protobuf.Feature_BytesList{
+			BytesList: &protobuf.BytesList{Value: [][]byte{
+				[]byte("Brad Pitt"), []byte("Edward Norton"), []byte("Helena Bonham Carter"),
+			}},
+		},
+	}
+	actors = &protobuf.FeatureList{Feature: []*protobuf.Feature{movie1Actors, movie2Actors}}
+
+	sequenceExample = &protobuf.SequenceExample{
+		Context: &protobuf.Features{
+			Feature: map[string]*protobuf.Feature{"age": age},
+		},
+		FeatureLists: &protobuf.FeatureLists{
+			FeatureList: map[string]*protobuf.FeatureList{
+				"movie_names":   movieNames,
+				"movie_ratings": movieRatings,
+				"actors":        actors,
+			},
+		},
 	}
 
 	exampleJSON = `{` +
@@ -37,6 +73,34 @@ var (
 		`}` +
 		`}` +
 		`}`
+
+	sequenceExampleJSON = `{` +
+		`"context":{` +
+		`"feature":{` +
+		`"age":{"int64List":{"value":[29]}}` +
+		`}` +
+		`},` +
+		`"featureLists":{` +
+		`"featureList":{` +
+		`"actors":{` +
+		`"feature":[` +
+		`{"bytesList":{"value":["Tim Robbins","Morgan Freeman"]}},` +
+		`{"bytesList":{"value":["Brad Pitt","Edward Norton","Helena Bonham Carter"]}}` +
+		`]` +
+		`},` +
+		`"movie_names":{` +
+		`"feature":[` +
+		`{"bytesList":{"value":["The Shawshank Redemption","Fight Club"]}}` +
+		`]` +
+		`},` +
+		`"movie_ratings":{` +
+		`"feature":[` +
+		`{"floatList":{"value":[9,9.7]}}` +
+		`]` +
+		`}` +
+		`}` +
+		`}` +
+		`}`
 )
 var marshalingTests = []struct {
 	desc string
@@ -44,6 +108,7 @@ var marshalingTests = []struct {
 	json string
 }{
 	{"example object", example, exampleJSON},
+	{"sequenceExample object", sequenceExample, sequenceExampleJSON},
 }
 
 func TestMarshaling(t *testing.T) {
