@@ -29,3 +29,31 @@ or, read from `stdin`
 ```bash
 cat data_tfrecord-00000-of-00001 | tfr -n 1
 ```
+
+## Examples
+
+`tfr` is best used with other great tools like [jq](https://github.com/stedolan/jq),
+[gsutil](https://cloud.google.com/storage/docs/gsutil) and `gunzip`.
+
+### Compressed tfrecords from Google Cloud Storage
+```bash
+gsutil cat gs://<bucket>/<path>/data_tfrecord-00000-of-00001.gz | gunzip | tfr -n 1 | jq .
+```
+
+### Flatten example structure
+```bash
+tfr data_tfrecord-00000-of-00001 | jq '.features.feature | to_entries | map( {(.key): .value[].value} ) | add'
+{
+  "age": [
+    29
+  ],
+  "movie": [
+    "The Shawshank Redemption",
+    "Fight Club"
+  ],
+  "movie_ratings": [
+    9,
+    9.7
+  ]
+}
+```
